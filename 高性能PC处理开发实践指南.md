@@ -45,40 +45,39 @@ def register_context_trigger(context_name, sop_id, probability=1.0):
 
 **结构**: 每个 SOP 是一个 Graph, 每个 Step 是一个 Node.
 
-- **SOP Loader**: 解析 Markdown 文件 (`SOP_Daily_Review.md`)。
+- **SOP Loader**: 解析 Markdown 文件 (见 `brain/sop_engine.py`)。
 - **Dynamic Graph Construction**:
   ```python
-  # Pseudo-code for converting SOP MD to LangGraph
+  # (See implementation in brain/sop_engine.py)
   workflow = StateGraph(AgentState)
-  for step in sop.steps:
-      workflow.add_node(step.name, create_agent_node(step.prompt))
-      workflow.add_edge(previous_step, step.name)
+  for step in self.sop.steps:
+      workflow.add_node(step.name, self._create_node_function(step))
   ```
 
 ### 2.4 Hybrid Router (Local vs Cloud)
 
 - **Rule-based Routing**:
-  - `if task.type == 'privacy_sensitive'`: Use Local (Qwen-14B).
-  - `if task.type == 'complex_reasoning'`: Use Cloud (DeepSeek-V3 / Claude-3.5).
-  - `if task.type == 'creative_writing'`: Use Cloud (GPT-4o).
+  s- `config/config.yaml` 定义了不同 Agent Role 对应的 Model Provider。
+  - `analyst` -> `DeepSeek-V3` (Cloud).
+  - `writer` -> `Qwen-2.5-14B` (Local).
 
-## 3. 开发路线图 (Implementation Roadmap)
+## 3. 开发路线图 (Current Status)
 
 ### Phase 1: The Base (Memory & Graph)
-- [ ] 部署 Neo4j 与 ChromaDB。
-- [ ] 定义基础 Schema: `User`, `Context`, `SOP`.
-- [ ] 编写 Python SDK (`lifeos.graph`, `lifeos.memory`).
+- [x] 部署 Neo4j 与 ChromaDB (Configuration in `config/config.yaml`).
+- [x] 定义基础 Schema与操作 (Reference `knowledge_graph/graph_client.py`).
 
 ### Phase 2: The Eye (Context Ingestion)
-- [ ] 实现 `POST /events/context` 接口。
-- [ ] 编写简单的规则引擎：将 Sensor JSON 映射为 Graph Context Nodes。
+- [x] 实现 `POST /ingest/context` 接口 (Reference `gateway/api_server.py`).
+- [x] 编写规则引擎：`brain/context_watcher.py` (Implements `evaluate_triggers`).
 
 ### Phase 3: The Brain (SOP Engine)
-- [ ] 编写 `SOP Parser`：将 Markdown 转换为 JSON Graph Definition。
-- [ ] 搭建 `LangGraph` 运行环境，支持动态加载这些 Definitions。
+- [x] 编写 `SOP Parser`：(Reference `brain/sop_engine.py`).
+- [x] 搭建 `LangGraph` 运行环境：已实现基础 `SOPEngine` 类。
 
 ### Phase 4: The Interface (Commander Deck)
-- [ ] 暴露 `GET /graph/active` 接口供前端绘制作战地图。
+- [ ] 暴露 `GET /graph/active` 接口 (Stub implemented in `api_server.py`).
+- [ ] 前端可视化开发 (Next.js + ForceGraph).
 
 
 ### 3.2 任务编排建议

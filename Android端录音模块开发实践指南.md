@@ -25,16 +25,24 @@
 public JSONObject snapshotContext() {
     JSONObject ctx = new JSONObject();
     ctx.put("timestamp", Instant.now().toString());
+    ctx.put("source_device", "Android_S24"); // Required by API
     
-    // 1. Location Inference
-    if (wifiSSID.equals("MyHomeWiFi")) ctx.put("location", "Home");
+    JSONArray nodes = new JSONArray();
     
-    // 2. Activity Recognition
-    ctx.put("activity", lastDetectedActivity); // e.g., "IN_VEHICLE"
+    // 1. Location Node
+    if (wifiSSID.equals("MyHomeWiFi")) {
+        nodes.put(new JSONObject().put("type", "LOCATION").put("value", "Home"));
+    }
     
-    // 3. Device State
-    ctx.put("battery", batteryLevel);
+    // 2. Activity Node
+    nodes.put(new JSONObject().put("type", "ACTIVITY").put("value", lastDetectedActivity));
     
+    // 3. Biometric Node (if available)
+    if (heartRate > 100) {
+        nodes.put(new JSONObject().put("type", "BIOMETRIC").put("value", "HighHeartRate"));
+    }
+
+    ctx.put("context_nodes", nodes);
     return ctx;
 }
 ```
@@ -42,7 +50,9 @@ public JSONObject snapshotContext() {
 ### 3.2 意图检测 (`IntentEngine`)
 
 - **Hotword**: 检测到 "Hey LifeOS" -> 触发 `HighPriorityMode`.
-- **Payload Construction**: 将 Audio 文件上传至 NAS 后，立即发送 `POST /ingest/context` 包含 `{ "intent": "command", "audio_ref": "..." }`.
+- **Payload Construction**: 
+  - 上传 Audio 至 NAS/S3。
+  - 调用 `POST /ingest/context`，附带 `intent` 类型的 context node。
 
 ### 3.3 元数据融合 (`ContextFuser`)
 

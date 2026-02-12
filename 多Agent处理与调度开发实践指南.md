@@ -1,4 +1,4 @@
-# LifeOS Tactical Orchestration Implementation Guide
+# LifeOS Tactical Orchestration Implementation Guide (Active Strategy Room)
 
 本指南聚焦于如何实现 **SOP-based Execution Swarm**，核心是让 Agent 严格遵循 **Standard Operating Procedures (SOP)** 进行战斗。
 
@@ -6,70 +6,70 @@
 
 - **Orchestration Core**：
   - **LangGraph**: 唯一推荐。完美契合 State Machine + Graph 拓扑，能够精确实现 SOP 中的 "Step 1 -> Step 2 -> Checkpoint" 逻辑。
+  - **Implementation**: 见 `brain/sop_engine.py`。
 - **SOP Format**: `Markdown` (人类可读) + `YAML Frontmatter` (机器可解析元数据)。
+- **Trigger System**:
+  - **Context Watcher**: 见 `brain/context_watcher.py`，负责监听传感器数据并激活 SOP。
 - **Prompt Engineering**:
   - **System Prompt Injection**: 将 SOP 的当前步骤作为 System Prompt 动态注入给 Worker。
 
 ## 2. 核心模式实现 (Patterns)
 
-### 2.1 模式一：SOP 加载与执行 (The SOP Runner)
+### 2.1 模式一：SOP 加载与执行 (The SOP Engine)
 
 将 Markdown 格式的 SOP 转换为 LangGraph 的 `StateGraph`。
 
 ```python
-# 伪代码：SOP 到 Graph 的转换
-def load_sop_to_graph(sop_path):
-    sop = parse_markdown(sop_path) # 解析出 steps
-    workflow = StateGraph(AgentState)
-    
-    # 1. Add Nodes
-    for step in sop.steps:
-        # 为每个步骤创建一个 Node
-        workflow.add_node(step.id, create_agent_node(role=step.role, prompt=step.instruction))
+# 核心逻辑 (见 brain/sop_engine.py)
+class SOPEngine:
+    def _parse_sop_md(self, path):
+        # Parses YAML Frontmatter + Markdown Steps
+        ...
         
-    # 2. Add Edges (Linear or Branching)
-    for i in range(len(sop.steps) - 1):
-        workflow.add_edge(sop.steps[i].id, sop.steps[i+1].id)
-        
-    # 3. Add Checkpoints (Human-in-the-loop)
-    memory = MemorySaver()
-    return workflow.compile(checkpointer=memory)
+    def _build_graph(self):
+        # Maps SOP Steps -> LangGraph Nodes
+        workflow = StateGraph(AgentState)
+        for step in self.sop.steps:
+            workflow.add_node(step.name, ...)
+        return workflow.compile()
 ```
 
 ### 2.2 模式二：动态路由 (Context-Aware Routing)
 
+由 `ContextManager` (The Eye) 负责感知环境变化并推送 Trigger 信号。
+
 ```python
-def router_node(state):
-    # 根据 Context 决定加载哪个 SOP
-    context = state['context']
-    if context.location == "Gym":
-        return "sop_fitness_log"
-    elif context.idea_type == "coding":
-        return "sop_github_pr"
-    else:
-        return "sop_general_chat"
+# 见 brain/context_watcher.py
+async def evaluate_triggers(self, context_payload):
+    # Rule 1: Morning Briefing
+    if context.location == "Home" and context.activity == "WakingUp":
+        return ["SOP_001_Morning_Briefing"]
+    
+    # Rule 2: Stress Intervention
+    if context.biometrics.stress == "High":
+        return ["SOP_999_Emergency_Calm"]
 ```
 
 ## 3. SOP 文档结构规范 (SOP Spec)
 
-一个标准的 SOP `.md` 文件应包含：
+一个标准的 SOP `.md` 文件应包含 YAML 头和步骤定义：
 
 ```markdown
 ---
-id: sop_daily_report
-trigger: "Timer: 18:00" OR "Intent: Summarize today"
-roles: [Summarizer, Formatter]
+id: SOP_001_Morning_Briefing
+alias: "Golden Morning"
+trigger:
+  - "Condition: Location == Home AND State == WakingUp"
+roles: 
+  - { id: "analyst", model: "deepseek-v3" }
+  - { id: "writer", model: "qwen2.5-14b" }
 ---
 
-# Daily Report Protocol
+# Phase 1: Context Gathering
+- **Step 1.1**: Query `CalendarAPI` for priorities.
 
-## Step 1: Gather Data (Summarizer)
-- Action: RAG Query "What did I do today?"
-- Output: Raw Bullet Points.
-
-## Step 2: Format (Formatter)
-- Action: Transform to Markdown Table.
-- Checkpoint: Human Approval needed before Save.
+# Phase 2: Action
+- **Step 2.1**: Synthesize briefing audio.
 ```
 
 ## 4. 调试与追踪
