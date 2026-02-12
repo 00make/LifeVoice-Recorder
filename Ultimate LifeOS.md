@@ -1,33 +1,95 @@
-个人全栈私有化AI生活系统：Ultimate LifeOS 框架设计
+# Ultimate LifeOS: The Active Strategy Room (ASR)
 
-您的想法已经非常完整，我来帮您彻底打开脑洞，把这套系统打造成一个全私有化、持续进化的个人数字孪生系统——命名为 LifeOS（Life Operating System）。它不仅仅是日志记录，而是实时感知您、理解您、辅助您、甚至预测您的完整闭环。
+**LifeOS ASR** 是一个具备 **SOP 执行能力** 和 **场景感知能力** 的个人主动战情室。
+它不再是一个被动的“录音笔/笔记软件”，而是一个 **永远在线的、主动为您运筹帷幄的数字参谋长**。
 
-核心理念：
-全模态终身采集 → 私有化实时/异步处理 → 多Agent智能调度 → 极简可视化回顾与交互
-完全私有、无云依赖、端到端加密、数据永不离开您的硬件。
-系统会逐渐“学会您”，从被动记录进化到主动辅助（例如：检测您疲劳时自动降低通知、预测您下一项任务）。
-1. 系统整体架构（层级分工）
+## 1. 核心定义 (The Shift)
 
-+-------------------+ +-------------------+ +-------------------+ | 采集层 | | 存储/传输层 | | 算力/智能层 | | (手机 + 手表 + ...) | <---> | NAS (存储中枢) | <---> | 高性能PC (RTX 5090)| | - 实时传感器 | | - 加密存储 | | - 多模态融合 | | - 轻量预处理 | | - 数据湖 | | - 意图/状态推理 | | - 边缘决策 | | - 同步服务 | | - 多Agent调度 | +-------------------+ +-------------------+ +-------------------+ | | | +----------------> 可视化层 <-----------------------------+ (Web/Mobile 前端：Memos + Dashboard) - 时间轴日记 - 日历/仪表盘 - 交互查询（语音/文本） 
+从 **Archivist (档案员)** 进化为 **Strategist (战略家)**。
 
-2. 各组件详细分工与推荐技术栈（2026年最佳实践）
+| 维度 | 旧 LifeOS (Passive) | 新 LifeOS ASR (Active) |
+| :--- | :--- | :--- |
+| **感知** | 记录声音 (Audio) | 感知语境 (Audio + Location + Biometrics) |
+| **逻辑** | 检索信息 (Search) | 匹配 SOP (Strategy Matching) |
+| **行动** | 等待查询 (Waiting) | 主动执行 (Execution) |
+| **界面** | 笔记本 (List) | 战情室 (Dashboard) |
 
-层级组件主要职责推荐技术栈（开源/自建）脑洞扩展功能采集层手机端 (Android)- 全天候多模态采集：语音（麦克风）、位置（GPS）、图片/视频（相机）、天气（API+传感器）、WiFi/蓝牙状态、屏幕使用、步数等。<br>- 实时轻量处理：VAD、sherpa-onnx实时ASR、简单意图检测。<br>- 边缘行动：本地执行简单命令（提醒、笔记）。- 自定义App（基于LifeVoice Live）<br>- Sensor API + Camera2 + Location Services<br>- sherpa-onnx QNN（语音）<br>- Tasker/Automate 自动化- “情境觉醒”：结合位置+WiFi+时间，自动切换模式（如“在家”开启深度监听）。<br>- 拍照即记录：自动为照片打上下文标签（位置+当时语音）。手表端 (Wear OS)- 生理数据采集：心率、血氧、压力、睡眠、运动。<br>- 轻量语音/按键触发。<br>- 与手机同步。- Wear OS App（Kotlin）<br>- Google Fit/Health Services API<br>- Porcupine唤醒词- “生物反馈闭环”：检测心率升高+语音压力词 → 自动推送呼吸引导或记录“情绪事件”。其他边缘设备（未来）- 智能家居传感器（温度、空气质量）、车载OBD、AR眼镜等。- Home Assistant 集成- 全屋感知：NAS作为IoT Hub。存储/传输层NAS (中枢)- 所有原始+处理后数据统一存储（数据湖）。<br>- 加密同步服务（手机/手表/PC实时推送）。<br>- 元数据索引（时间、标签、模态）。- TrueNAS/OMV/Unraid<br>- Nextcloud/Syncthing（加密同步）<br>- MinIO（对象存储）<br>- PostgreSQL（元数据）- “无限回溯”：版本化存储所有历史数据，支持时光机式回放一天生活。算力/智能层高性能PC (RTX 5090)- 多模态融合：语音转录（Whisper Large）、图像描述（LLaVA）、视频关键帧提取。<br>- 实时/异步意图与状态推理：判断“当前在工作/休息/社交”，预测下一步需求。<br>- 多Agent核心调度。- Docker/Kubernetes 轻量集群<br>- Ollama/vLLM（本地LLM）<br>- Whisper + Pyannote（语音）<br>- LLaVA/Claude-3.5本地版（视觉）- “数字孪生镜像”：构建您的行为模型，模拟“如果我现在做X，会怎样”。可视化层Web 前端平台- 极简日记查看：时间轴+日历+多模态嵌入（像flomo，但更丰富）。<br>- 一键回顾当天“点点滴滴”。<br>- 自然语言查询（“上周我最开心的时候是？”）。- 核心：Memos（时间轴+日历，完美flomo式）<br>- 扩展：Grafana（生理/活动仪表盘）+ Flame（时间轴热图）<br>- Custom Dashboard（React + Tailwind）<br>- API：Memos OpenAPI + Nextcloud- “沉浸式回放”：点击日期 → 重现当天语音+照片+位置轨迹动画。智能调度层多Agent 系统平台- 维护整个系统的“大脑”：多个Agent协作处理任务。<br>- 自动执行：总结、预测、提醒、数据清洗、模型微调。- 框架：CrewAI 或 AutoGen（2026年最成熟）<br>- Agent分工示例：<br> • Collector Agent：监控新数据入库<br> • Analyzer Agent：多模态融合+意图推理<br> • Summarizer Agent：每日生成结构化日记（写回Memos）<br> • Predictor Agent：基于历史预测明天计划<br> • Guardian Agent：隐私审计+异常检测<br> • Tool Agents：调用外部工具（天气API、日历）<br>- Orchestrator：LangGraph 状态机管理Agent流- “自我进化”：Meta-Agent定期评估系统表现，自动微调提示词或添加新Agent。<br>- “代理人生”：让Agent模拟您的决策风格，提出“如果我是你，我会……”建议。
+## 2. 系统架构 (The War Room Architecture)
 
-3. 数据流全景（闭环）
-采集 → 传输：手机/手表实时检测事件 → 轻量预处理 → 加密推送至NAS（WebDAV/WebSocket）。
-存储 → 处理：NAS触发Webhook通知PC → PC多Agent接管 → 融合分析 → 生成洞察（意图、情绪、总结）。
-输出 → 可视化：处理结果通过API写回Memos（新日记条目）+ Grafana（图表）。
-反馈 → 行动：Agent检测高优先级事件 → 通过Push通知手机/手表执行（或语音播报）。
-闭环学习：所有交互日志回流，用于微调本地LLM（LoRA方式），系统越来越“懂您”。
-4. 脑洞最大开的未来功能（分阶段实现）
-Phase 1（现在-6个月）：完善采集（手机+手表）+ NAS存储 + Memos可视化 + 基础多Agent每日总结。
-Phase 2（6-12个月）：实时意图预测（“你现在可能想喝咖啡，因为心率+位置+历史”）+ 自动行动（订外卖、调空调）。
-Phase 3（1-2年）：完整数字孪生——Agent可“代您”处理低价值任务（如回复邮件草稿、安排日程）。
-终极脑洞： 
-“平行人生模拟”：Agent基于历史数据模拟“如果去年我多运动，现在会怎样”。
-“情绪天气预报”：预测您一天情绪曲线。
-“遗产模式”：系统可训练成“数字您”，供后代交互。
-这套框架完全可落地，从您已有的手机App和Memos开始，一步步扩展。所有组件都是开源自建，成本仅硬件+电费。
+### Layer 1: Field Sensors (前线感知)
+- **LifeVoice Sensory (Android/Wear)**: 全天候采集声音，同时附带“地理位置”、“运动状态”、“生理指标”。
+- **Context Fusion**: 将“我刚才说了什么”与“我在哪/我很累”结合，形成完整的 **Situation (态势)**。
 
-如果您想深入某一部分（例如多Agent的具体CrewAI配置代码、NAS Docker Compose、或手表App开发指南），直接告诉我，我立刻给出详细方案！您已经走在构建个人“贾维斯”的最前沿了，加油！
+### Layer 2: Strategic Core (战略核心 - PC/Brain)
+- **Insight Engine**: 识别态势。识别出“这是一个灵感”还是“这是一个紧急BUG”。
+- **SOP Registry (SOP 库)**: 存储您积累的所有技能说明书 (e.g., "如何写周报", "如何处理服务器报警").
+- **Strategy Matcher**: 自动将 **Situation** 映射到对应的 **SOP**。
+
+### Layer 3: Tactical Swarm (战术集群 - Agents)
+- **Orchestrator**: 指挥官 Agent，负责拆解 SOP。
+- **Special Forces**: 专职 Agent (Coder, Writer, Analyst) 并行执行任务。
+- **Tools**: 调用 API, CLI, IoT 接口。
+
+### Layer 4: Command Deck (指挥舱 - Visualization)
+- **Library View**: 资源与知识图谱 (Past).
+- **Pipeline View**: 正在执行的任务流水线 (Present).
+- **Dashboard View**: 精力水位与决策建议 (Future).
+
+## 3. 核心数据流 (The Strategic Loop)
+
+1.  **Sense**: 也是感知。Sensor 捕捉到您在 *Starbucks* 说 "Start Project X"。
+2.  **Contextualize**: 系统识别到 Location=Starbucks (Work Mode), State=High Energy.
+3.  **Decide**: 检索 SOP 库，找到 `SOP_Project_Kickoff.md`。
+4.  **Exchange**: Orchestrator 激活 Product Manager Agent & Tech Lead Agent。
+5.  **Act**: Agents 自动创建 GitHub Repo，生成 Notion Page，发送 Slack 通知。
+6.  **Report**: 指挥舱即时显示 "Project X Kickoff: 25% Active".
+
+## 4. 落地路线
+
+- **Phase 1: Awareness (感知)** - 建立 Context Node，让系统知道你在哪、状态如何。
+- **Phase 2: Procedure (规程)** - 沉淀 `SKILL.MD`，建立 SOP 库。
+- **Phase 3: Execution (执行)** - 让 Agent 能够读取 SOP 并调用 Tools。
+- **Phase 4: Synthesis (全知)** - 完整的战情室视图。
+
+
+为保证可执行性，拆分为多个 PRD 与开发实践指南：
+
+- 手机端录音：
+  - `Android端录音模块PRD.md`
+  - `Android端录音模块开发实践指南.md`
+- NAS 存储/传输：
+  - `NAS端存储与传输PRD.md`
+  - `NAS端存储与传输开发实践指南.md`
+- 高性能 PC 处理：
+  - `高性能PC处理PRD.md`
+  - `高性能PC处理开发实践指南.md`
+- 实时传感器采集（手机/手表/边缘设备）：
+  - `实时传感器采集PRD.md`
+  - `实时传感器采集开发实践指南.md`
+- 多 Agent 处理与调度：
+  - `多Agent处理与调度PRD.md`
+  - `多Agent处理与调度开发实践指南.md`
+- 反馈与行动（推送/语音播报）：
+  - `反馈与行动PRD.md`
+  - `反馈与行动开发实践指南.md`
+- 闭环学习（LoRA/持续学习）：
+  - `闭环学习PRD.md`
+  - `闭环学习开发实践指南.md`
+
+## 4. 数据流闭环（Swarm Loop）
+
+1.  **Insight (洞察)**：采集层上传数据，Insight Agent 识别出“用户需要X”。
+2.  **Intent (意图)**：Master Agent 将需求转化为“任务书”与 KPI。
+3.  **Fission (裂变)**：Orchestrator 生成 N 个 Expert Agents 并行执行（搜索、编码、分析）。
+4.  **Result (结果)**：Critic Agent 验收成果，最终交付给 Commander (用户) 或写入长期记忆。
+
+## 5. 里程碑（可执行版本）
+
+- Phase 1（0-6 个月）：**感知构建**。录音采集 + NAS 存储 + 基础转录 + RAG 知识库搭建。
+- Phase 2（6-12 个月）：**意图理解**。多模态融合 + 基础 Agent 调度 (LangGraph/AutoGen) + 自动化任务执行。
+- Phase 3（12-24 个月）：**群体智能**。实现 `Insight -> Intent -> Fission` 全自动闭环，达到“一人即军团”状态。
+
+## 6. 约束与原则
+
+- **算力即正义**：充分压榨本地 GPU (RTX 4090/5090) 性能，减少云端依赖。
+- **Agent 可观测性**：必须记录每个 Agent 的思考过程 (CoT) 与决策树。

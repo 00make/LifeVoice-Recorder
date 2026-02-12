@@ -1,110 +1,167 @@
-# 基于 sherpa-onnx QNN APK 开发 Android AI 语音识别应用的的最佳实践指南
+# LifeOS Field Sensor Implementation Guide (Android)
 
-您提到的 APK 文件  
-**sherpa-onnx-1.12.23-qnn-arm64-v8a-simulated_streaming_asr-zh_en_ko_ja_yue-5-seconds-sense_voice_2024_07_17_int8.apk**  
-是一个预编译的演示应用，使用 **SenseVoice 多语言模型**（支持中文、英文、日文、韩文、粤语），在 Qualcomm NPU（QNN/HTP 后端）上实现**模拟流式**实时语音识别。由于 QNN 不支持动态输入形状，该模型固定处理 **5 秒**音频片段（短于 5 秒会填充，长于 5 秒会截断）。
+本指南面向 **Swarm Sensory Node** 开发，聚焦：**高灵敏度 VAD + 意图捕捉 + 实时 Context 融合**。
 
-如果您想基于此开发自己的 AI 应用（例如自定义 UI、集成到其他功能、优化体验），建议不要直接反编译预制 APK，而是从官方开源示例项目入手进行二次开发。下面是完整的最佳实践指南。
+## 1. 核心变更点 (vs Traditional Recorder)
 
-### 1. 前提条件与硬件要求
+- **Input**: 不只是 Audio，还需要融合 `SensorManager` 数据。
+- **Output**: 构造符合 `LifeOS Context API` 的 JSON Payload。
+- **Protocol**: 必须实现新的 `POST /ingest/context` 接口调用逻辑。
 
-- **设备要求**：必须使用 Qualcomm Snapdragon SM8350（Snapdragon 888）或更高型号（如 SM8450、SM8550、SM8650、SM8750、SM8850 等），这些芯片才支持 HTP（Hexagon Tensor Processor）加速。
-- **开发环境**：
-  - Android Studio（最新版推荐）
-  - Android NDK（r25+）
-  - CMake 3.22+
-  - Qualcomm QNN SDK（需从 Qualcomm 开发者网站注册下载，设置环境变量 `QNN_SDK_ROOT`）
-- **模型特点**：
-  - SenseVoice 2024-07-17 int8 量化版本，多语言自动检测。
-  - 固定 5 秒输入 → 适合短句实时识别，长语音需分段处理。
+## 2. 环境准备
 
-### 2. 推荐开发路径：从官方示例项目开始
+- **High Performance Edge**: Snapdragon 8Gen2+ (推荐) 以支持端侧实时模型。
+- **Android SDK**: 34+ (Android 14/15 适配 foreground types)。
+- **ML Stack**:
+  - `sherpa-onnx` (ASR/KWS)
+  - `silero-vad` (VAD)
 
-官方提供了完整的 Android 示例源码：  
-<https://github.com/k2-fsa/sherpa-onnx/tree/master/android/SherpaOnnxSimulateStreamingAsr>
+## 3. 模块设计 (Sensory Pipeline)
 
-这是您提到的预制 APK 的源码基础，直接在此基础上修改是最安全、高效的方式。
+### 3.1 Context Fusion Engine (New)
 
-#### 详细构建步骤
+```java
+// ContextManager.java
+public JSONObject snapshotContext() {
+    JSONObject ctx = new JSONObject();
+    ctx.put("timestamp", Instant.now().toString());
+    
+    // 1. Location Inference
+    if (wifiSSID.equals("MyHomeWiFi")) ctx.put("location", "Home");
+    
+    // 2. Activity Recognition
+    ctx.put("activity", lastDetectedActivity); // e.g., "IN_VEHICLE"
+    
+    // 3. Device State
+    ctx.put("battery", batteryLevel);
+    
+    return ctx;
+}
+```
 
-1. **下载 QNN SDK**  
-   从 Qualcomm 开发者网站获取并解压，记住 `QNN_SDK_ROOT` 路径。
+### 3.2 意图检测 (`IntentEngine`)
 
-2. **克隆 sherpa-onnx 仓库**  
+- **Hotword**: 检测到 "Hey LifeOS" -> 触发 `HighPriorityMode`.
+- **Payload Construction**: 将 Audio 文件上传至 NAS 后，立即发送 `POST /ingest/context` 包含 `{ "intent": "command", "audio_ref": "..." }`.
 
-   ```bash
-   git clone https://github.com/k2-fsa/sherpa-onnx.git
-   cd sherpa-onnx
-   ```
+### 3.3 元数据融合 (`ContextFuser`)
 
-3. **构建 Android 共享库（包含 QNN 支持）**  
-   参考官方文档（<https://k2-fsa.github.io/sherpa/onnx/qnn/index.html）的> “Build shared libraries” 部分，使用 CMake + NDK 编译 arm64-v8a 架构的 `libsherpa-onnx.so` 等库。
+```kotlin
+data class SegmentMeta(
+    val audioHash: String,
+    val timeRange: TimeRange,
+    val location: GeoPoint?, // <--- New
+    val wifiSSID: String?,   // <--- New (Home/Office detection)
+    val motionType: String,  // <--- New (Walking/Driving)
+    val intentTag: String?   // <--- New (Idea/Command)
+)
+```
 
-4. **复制 QNN 库文件**  
-   将 QNN SDK 中的 `lib/hexagon*`、`lib/libQnnHtp.so` 等库复制到项目 jniLibs/arm64-v8a 目录。
+## 4. 关键实施步骤
 
-5. **下载模型文件**  
-   - 前往 <https://github.com/k2-fsa/sherpa-onnx/releases/tag/asr-models-qnn>  
+### Step 1: 建立传感器总线 (Sensor Bus)
+- 使用 `Flow` 或 `RxJava` 持续收集 Accelerometer 和 Location 更新。
+- 维护一个 `LastKnownContext` 对象。
 
-   - 将模型文件放入 Android 项目 assets 目录或可读存储路径。
+### Step 2: 升级 VAD 逻辑
+- 仅靠音量不够，使用 NLP 模型辅助。
+- 引入 **Generic VAD**，过滤掉风噪和车噪。
 
-6. **修改示例代码使用您的模型**  
-   打开 `android/SherpaOnnxSimulateStreamingAsr` 项目，在 Java/Kotlin 代码中：
-   - 修改模型路径配置（通常在 `MainActivity` 或相关类中）
-   - 设置语言提示（SenseVoice 支持自动检测，通常无需手动指定）
-   - 调整音频录制缓冲区大小（建议 5 秒为单位分段处理）
+### Step 3: 实时流式转录 (Visual Feedback)
+- 部署 `sherpa-onnx` 的 `sense-voice-small` 量化模型。
+- 将识别出的文字实时透传给 UI 层（悬浮窗或通知栏），**不**作为最终结果存储（因为 PC 端会有更好的），只做用户确认用。
 
-7. **在 Android Studio 中构建并运行**  
-   - 打开项目，同步 Gradle
-   - 连接支持的 Qualcomm 手机
-   - Build → Generate Signed APK 或直接 Run
+### Step 4: 优先级上传队列
+- `WorkManager` (Deferrable) -> 普通 VAD 片段。
+- `Retrofit/OkHttp Immediate` -> Intent Command 片段 (忽略省电策略)。
 
-### 3. 最佳实践与优化建议
+## 5. 功耗控制 (Battery Doctor)
 
-#### 性能优化
+- **Geofence**: 在家 (Wi-Fi) 高频采集，外出低频采集。
+- **Motion Gating**: 手机静止平放 > 10min -> 降低 VAD 采样率。
 
-- **int8 量化**：您选的模型已是 int8，NPU 利用率最高，延迟最低。
-- **固定 5 秒限制处理**：
-  - 实时场景：录音 → 每 5 秒切一段 → 送模型 → 拼接结果显示（模拟流式）。
-  - 长语音：使用 VAD（语音活动检测）检测端点后分段，避免无意义填充。
-- **首次运行慢**：在应用启动时预热 NPU（提前加载模型），或提示用户“首次使用稍慢”。
+## 6. 测试策略
 
-#### UI/UX 最佳实践
+- **Intent Latency**: 从说出 "Hey Agent" 到 PC 端收到 Webhook < 3s。
+- **False Acceptance**: 关键词误触率 < 1次/天。
 
-- **实时显示**：边录边显示部分结果（分段识别），提升流畅感。
-- **语言自动检测**：SenseVoice 自带语言 ID，无需手动切换。
-- **错误处理**：
-  - NPU 初始化失败 → 降级到 CPU 运行（sherpa-onnx 支持 fallback）
-  - 录音权限、设备不支持提示友好错误。
-- **省电与后台**：避免长时间连续录音，使用前台服务 + 部分唤醒。
 
-#### 权限与安全
+- Opus 编码：建议 16kHz/mono/16kbps~32kbps
+- AES-256：每段独立 IV；密钥存于 Android Keystore
+- 元数据：时间戳、时长、是否含语音、设备状态
 
-- 必须声明权限：
+### 4.3 上传机制（先手动）
 
-  ```xml
-  <uses-permission android:name="android.permission.RECORD_AUDIO" />
-  <uses-permission android:name="android.permission.FOREGROUND_SERVICE" /> <!-- 如需后台 -->
-  ```
+- 用户触发上传
+- 断点续传 & 幂等命名：`{date}/{segmentId}.opus`
+- 失败重试 + 仅 Wi-Fi 上传选项
 
-- 运行时动态请求录音权限。
+### 4.4 实时转录（可选）
 
-#### 测试与调试
+若采用 SenseVoice/QNN：
 
-- 在多款 Qualcomm 手机测试（888、8 Gen1、8 Gen2、8 Gen3 等）。
-- 使用 adb logcat 查看 QNN/Hexagon 日志，检查是否真正跑在 NPU 上。
-- 对比 CPU 模式性能差异（关闭 QNN 后端测试）。
+- 每 5 秒切块送模型（模拟流式）
+- 结果拼接显示
+- NPU 初始化失败 → CPU fallback
 
-#### 许可证注意
+---
 
-- sherpa-onnx 代码：Apache-2.0
-- SenseVoice 模型：请查看模型来源的许可证（通常允许商用，但需确认）。
+## 5. 测试策略（必须做）
 
-### 4. 其他资源
+### 5.1 单元测试
 
-- 官方 QNN 文档：<https://k2-fsa.github.io/sherpa/onnx/qnn/index.html>
+- VAD 边界：静音→语音→静音场景
+- 分段逻辑：最大段长、最小段长、长静音
+- 加密/解密正确性（与工具脚本对比）
+
+### 5.2 仪器测试（设备）
+
+- 前台服务常驻 8h+ 稳定性
+- 断网/飞行模式 → 恢复上传
+- 系统后台限制（小米/三星）
+
+### 5.3 音质与性能评估
+
+- 采样率一致性（16k/mono）
+- 语音段漏检率、误检率
+- 电量消耗（统计 8h 使用）
+
+### 5.4 关键回归清单
+
+- 录音权限拒绝/恢复
+- 通话/其他 App 占用麦克风
+- 低电量模式与省电策略
+
+---
+
+## 6. 上线前检查（MVP）
+
+- 前台通知文案清晰、可一键暂停/恢复
+- 本地存储清理策略（7/14 天自动清理）
+- 数据导出与删除说明
+- 隐私提示：录音提示、用户控制权明确
+
+---
+
+## 7. 参考资源
+
+- sherpa-onnx QNN 文档：<https://k2-fsa.github.io/sherpa/onnx/qnn/index.html>
+- sherpa-onnx Android 示例：<https://github.com/k2-fsa/sherpa-onnx/tree/master/android/SherpaOnnxSimulateStreamingAsr>
 - 模型下载：<https://github.com/k2-fsa/sherpa-onnx/releases/tag/asr-models-qnn>
-- 示例源码：<https://github.com/k2-fsa/sherpa-onnx/tree/master/android/SherpaOnnxSimulateStreamingAsr>
-- 社区讨论：GitHub Issues（k2-fsa/sherpa-onnx）
 
-按照以上步骤，您可以快速得到一个稳定、高性能的多语言实时语音识别应用。如果在构建过程中遇到具体错误（如 QNN 库链接问题），欢迎提供错误日志，我可以进一步帮助排查。祝开发顺利！
+---
+
+## 8. 常见问题排查
+
+**Q: 录音一段时间后停止？**  
+A: 检查前台服务类型、通知常驻、厂商后台策略白名单。
+
+**Q: NPU 加载失败？**  
+A: 验证 QNN 库与设备匹配，fallback 到 CPU 并记录日志。
+
+**Q: 录音断片/漏录？**  
+A: 调整 VAD 阈值、最小段长；确认 AudioRecord buffer。
+
+---
+
+本指南会随着项目迭代更新，重点保证手机端模块可持续、低功耗运行，并为主机侧深度处理提供高质量输入。
